@@ -2,6 +2,8 @@ package org.shellupdate;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.Scanner;
@@ -58,9 +60,12 @@ public class Updater {
 			oldVersion.close();
 			newVersion.close();
 
-			if (oldVersion)
+			if (!oldShell.equals(newShell)) {
+				Files.move(newShell.toPath(), oldShell.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (IOException e) {
 			System.out.println("Not a valid jar file.");
+			e.printStackTrace();
 			System.exit(1);
 		}
 
