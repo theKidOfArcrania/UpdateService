@@ -3,6 +3,7 @@ package org.shellupdate;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -23,6 +24,8 @@ import java.util.Properties;
 import java.util.Vector;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+import java.util.zip.ZipEntry;
 
 import javax.swing.JOptionPane;
 
@@ -37,13 +40,13 @@ public class Shell {
 	 *
 	 * @param updateSource the new jar source update for the program
 	 * @param programPath the path of current program to update
-	 * @param valueChange
+	 * @param progress the progress monitor variable.
 	 * @return true if it is verified, false if it is not verified.
 	 * @throws IOException if an I/O exception occurs
-	 * @throws CertificateException if the updates cert cannot be loaded
+	 * @throws CertificateException if the updates certification cannot be loaded
 	 * @throws SecurityException if a verification error occurs.
 	 */
-	public static final synchronized boolean doUpdate(URL updateSource, Path programPath, ValueChange<Double> valueChange)
+	public static final synchronized boolean doUpdate(URL updateSource, Path programPath, ValueChange<Double> progress)
 			throws CertificateException, IOException, SecurityException {
 		if (updateSource == null) {
 			return false;
@@ -58,7 +61,7 @@ public class Shell {
 		}
 
 		// Make sure that the provider JAR file is signed with the "updater" signing certificate.
-		jv.verifyAndLoad(updateCert, tempUpgradePath, valueChange);
+		jv.verifyAndLoad(updateCert, tempUpgradePath, progress);
 
 		Files.move(tempUpgradePath, programPath, StandardCopyOption.REPLACE_EXISTING);
 
@@ -98,8 +101,6 @@ public class Shell {
 		try {
 			Thread.sleep(1000);
 		} catch (InterruptedException e) {
-			// TO DO Auto-generated catch block
-			e.printStackTrace();
 		}
 
 		// Copy the contents of jar file into a temp directory.
@@ -146,10 +147,26 @@ public class Shell {
 		shellJarFile.close();
 
 		if (updated) {
-			// TO DO: Make sure to rewrite stuff back to jar file
-			Files.walk(updShellPath).forEach(path -> {
+			progDialog.setProgressText("Copying update applies...");
+			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile))) {
+				byte[] buffer = new byte[8192];
 
-			});
+				Files.walk(updShellPath).forEach(path -> {
+					int lenRead;
+					try {
+						ZipEntry entry = new ZipEntry(path.relativize(updShellPath).toString());
+						jos.putNextEntry(entry);
+						try (InputStream in = Files.newInputStream(path)) {
+							while ((lenRead = in.read(buffer, 0, buffer.length)) != -1) {
+								jos.write(buffer, 0, lenRead);
+							}
+							jos.closeEntry();
+						}
+					} catch (IOException e) {
+						System.err.println("Unable to copy " + path.relativize(updShellPath) + "dir");
+					}
+				});
+			}
 		}
 
 		// Delete entire update folder.
