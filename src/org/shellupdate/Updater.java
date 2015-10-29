@@ -86,7 +86,7 @@ public class Updater {
 			KeyStore keyStore = KeyStore.getInstance("jks");
 
 			System.out.print("Enter password: ");
-			// TO DO: query passwords before doing jar signing.
+			// TO DO: query passwords before doing jar signing with ui.
 			keyStoreUrl.openStream();
 			sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), updateFile.toString(), "updater" });
 		} catch (IOException e) {
