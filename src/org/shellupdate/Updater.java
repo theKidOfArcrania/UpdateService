@@ -61,7 +61,6 @@ public class Updater {
 					JarEntry entry = entries.nextElement();
 					JarEntry oldEntry = oldVersion.getJarEntry(entry.getName());
 					if (oldEntry == null || entry.getLastModifiedTime().compareTo(oldEntry.getLastModifiedTime()) > 0) {
-						// TO DO: sign updates.
 						jos.putNextEntry(entry);
 						try (InputStream in = newVersion.getInputStream(entry)) {
 							while ((lenRead = in.read(buffer, 0, buffer.length)) != -1) {
@@ -87,6 +86,7 @@ public class Updater {
 
 			System.out.print("Enter password: ");
 			// TO DO: query passwords before doing jar signing with ui.
+
 			keyStoreUrl.openStream();
 			sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), updateFile.toString(), "updater" });
 		} catch (IOException e) {
