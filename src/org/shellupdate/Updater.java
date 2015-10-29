@@ -19,13 +19,6 @@ public class Updater {
 	private static Properties params;
 
 	public static void main(String[] args) throws IOException {
-		byte[] read = new byte[100];
-		System.in.read(read);
-		System.out.println();
-		System.out.println(new String(read));
-	}
-
-	public static void stuff(String[] args) throws IOException {
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
 		Scanner scrn = new Scanner(System.in);
