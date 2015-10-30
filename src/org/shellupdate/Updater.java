@@ -1,6 +1,7 @@
 package org.shellupdate;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,53 +9,41 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.util.Enumeration;
 import java.util.Properties;
-import java.util.Scanner;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
+import javax.swing.JOptionPane;
+
 public class Updater {
 	private static Properties params;
 
-	public static void main(String[] args) throws IOException {
-		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
+	public static void addUpdate(UpdateProgressDialog dlg, String updateName, File newShell, char[] keyStorePass, char[] updaterPass) {
+		try {
+			params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
-		Scanner scrn = new Scanner(System.in);
-		if (args.length != 1) {
-			System.out.println("Usage: java -jar Update.jar [New-jar version]");
-			System.exit(1);
-		}
-
-		File oldShell = new File(params.getProperty("shell.path"));
-		File newShell = new File(args[0]);
-
-		if (!newShell.exists()) {
-			System.out.println("File does not exist");
-			System.exit(1);
-		}
-
-		File updateFile = new File("");
-		String updateName = "";
-		while (updateName.matches("[A-Za-z1-0]+") && updateFile.exists()) {
-			System.out.print("Enter update name: ");
-			updateName = scrn.nextLine();
-			if (updateName.isEmpty()) {
+			// Make sure that we can access the updater password.
+			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
+			if (keyStoreUrl == null) {
+				JOptionPane.showMessageDialog(dlg, "Cannot find keystore.", "Updater", JOptionPane.ERROR_MESSAGE);
 				return;
 			}
-			updateFile = new File(params.getProperty("update.path"), updateName + ".upd");
-		}
+			KeyStore keyStore = KeyStore.getInstance("jks", "sun");
+			keyStore.load(keyStoreUrl.openStream(), keyStorePass);
+			keyStore.getKey("updater", updaterPass);
 
-		System.out.println();
-
-		try {
+			File oldShell = new File(params.getProperty("shell.path"));
+			if (!newShell.exists()) {
+				throw new FileNotFoundException(newShell.toString());
+			}
+			File updateFile = new File(params.getProperty("update.path"), updateName + ".upd");
 			int lenRead;
 			byte[] buffer = new byte[8196];
-
 			JarFile oldVersion = new JarFile(oldShell);
 			JarFile newVersion = new JarFile(newShell);
-
 			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(updateFile))) {
 				Enumeration<JarEntry> entries = newVersion.entries();
 				while (entries.hasMoreElements()) {
@@ -68,35 +57,28 @@ public class Updater {
 							}
 							jos.closeEntry();
 						}
-						System.out.println("Adding " + entry.getName() + " to update " + ".");
+						dlg.setStatus("Adding " + entry.getName() + " to update " + ".");
 					}
 				}
 			}
-
 			oldVersion.close();
 			newVersion.close();
-
 			if (!oldShell.equals(newShell)) {
 				Files.move(newShell.toPath(), oldShell.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			}
+			dlg.setStatus("Signing update file...");
 
-			System.out.println("Signing update file...");
-			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
-			KeyStore keyStore = KeyStore.getInstance("jks");
-
-			System.out.print("Enter password: ");
-			// TO DO: query passwords before doing jar signing with ui.
-
-			keyStoreUrl.openStream();
-			sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), updateFile.toString(), "updater" });
-		} catch (IOException e) {
-			System.out.println("Not a valid jar file.");
-			e.printStackTrace();
-			System.exit(1);
+			sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), "-storepasswd", new String(updaterPass),
+					"-keypasswd", new String(keyStorePass), updateFile.toString(), "updater", });
+			System.exit(0);
+		} catch (KeyStoreException e) {
+			JOptionPane.showMessageDialog(dlg, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
 		} catch (Exception e) {
-			e.printStackTrace();
-			System.exit(1);
+			JOptionPane.showMessageDialog(dlg, "Unable to update jar: " + e.getMessage(), "Updater", JOptionPane.ERROR_MESSAGE);
 		}
+	}
+
+	public static void main(String[] args) throws IOException {
 
 	}
 }

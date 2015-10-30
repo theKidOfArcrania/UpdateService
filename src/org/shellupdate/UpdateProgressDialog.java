@@ -4,46 +4,46 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.Insets; extends JDialog {
-
-	/**
-	 * Laun
-
+import java.awt.Insets;
 import java.io.File;
-
-public class UpdateProgressDialog
+import java.util.Arrays;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
-import javax.swing.WindowConstants;
-import javax.swing.border.EmptyBorder;ch the application.
-	 */
+import javax.swing.border.EmptyBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
+public class UpdateProgressDialog extends JDialog {
+
 	public static void main(String[] args) {
-		try {
-			UpdateProgressDialog dialog = new UpdateProgressDialog();
-			dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-			dialog.setVisible(true);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		UpdateProgressDialog dlg = new UpdateProgressDialog();
+		dlg.setVisible(true);
+	}
+
+	private static void clearPass(char[] password) {
+
 	}
 
 	private final JPanel contentPanel = new JPanel();
 	private final JLabel lblKeyStorePass;
-	private final JLabel lblUpdaterPassword;
-	private final JTextField textField;
-	private final JPasswordField passwordField;
+	private final JLabel lblUpdaterPass;
+	private final JPasswordField txtKeyStorePass;
+	private final JPasswordField txtUpdaterPass;
 	private final JLabel lblUpdatedVersion;
-	private final JButton btnLoad;
+	private final JButton cmdLoad;
 	private final JPanel panel;
-	private final JTextField txtVersion;
-	private final JButton button;
+	private JTextField txtVersion = null;
+	private final JButton cmdVersion;
 	private final JLabel lblUpdateName;
+
 	private final JTextField txtUpdateName;
+
 	private File newVersion;
 
 	/**
@@ -70,30 +70,30 @@ import javax.swing.border.EmptyBorder;ch the application.
 		gbc_lblKeyStorePass.gridy = 0;
 		contentPanel.add(lblKeyStorePass, gbc_lblKeyStorePass);
 
-		textField = new JTextField();
-		GridBagConstraints gbc_textField = new GridBagConstraints();
-		gbc_textField.insets = new Insets(5, 0, 10, 0);
-		gbc_textField.fill = GridBagConstraints.HORIZONTAL;
-		gbc_textField.gridx = 1;
-		gbc_textField.gridy = 0;
-		contentPanel.add(textField, gbc_textField);
-		textField.setColumns(10);
+		txtKeyStorePass = new JPasswordField();
+		GridBagConstraints gbc_txtKeyStorePass = new GridBagConstraints();
+		gbc_txtKeyStorePass.insets = new Insets(5, 0, 10, 0);
+		gbc_txtKeyStorePass.fill = GridBagConstraints.HORIZONTAL;
+		gbc_txtKeyStorePass.gridx = 1;
+		gbc_txtKeyStorePass.gridy = 0;
+		contentPanel.add(txtKeyStorePass, gbc_txtKeyStorePass);
+		txtKeyStorePass.setColumns(10);
 
-		lblUpdaterPassword = new JLabel("Updater Password:");
-		GridBagConstraints gbc_lblUpdaterPassword = new GridBagConstraints();
-		gbc_lblUpdaterPassword.anchor = GridBagConstraints.WEST;
-		gbc_lblUpdaterPassword.insets = new Insets(0, 10, 5, 10);
-		gbc_lblUpdaterPassword.gridx = 0;
-		gbc_lblUpdaterPassword.gridy = 1;
-		contentPanel.add(lblUpdaterPassword, gbc_lblUpdaterPassword);
+		lblUpdaterPass = new JLabel("Updater Password:");
+		GridBagConstraints gbc_lblUpdaterPass = new GridBagConstraints();
+		gbc_lblUpdaterPass.anchor = GridBagConstraints.WEST;
+		gbc_lblUpdaterPass.insets = new Insets(0, 10, 5, 10);
+		gbc_lblUpdaterPass.gridx = 0;
+		gbc_lblUpdaterPass.gridy = 1;
+		contentPanel.add(lblUpdaterPass, gbc_lblUpdaterPass);
 
-		passwordField = new JPasswordField();
-		GridBagConstraints gbc_passwordField = new GridBagConstraints();
-		gbc_passwordField.insets = new Insets(0, 0, 5, 0);
-		gbc_passwordField.fill = GridBagConstraints.HORIZONTAL;
-		gbc_passwordField.gridx = 1;
-		gbc_passwordField.gridy = 1;
-		contentPanel.add(passwordField, gbc_passwordField);
+		txtUpdaterPass = new JPasswordField();
+		GridBagConstraints gbc_txtUpdaterPass = new GridBagConstraints();
+		gbc_txtUpdaterPass.insets = new Insets(0, 0, 5, 0);
+		gbc_txtUpdaterPass.fill = GridBagConstraints.HORIZONTAL;
+		gbc_txtUpdaterPass.gridx = 1;
+		gbc_txtUpdaterPass.gridy = 1;
+		contentPanel.add(txtUpdaterPass, gbc_txtUpdaterPass);
 
 		lblUpdatedVersion = new JLabel("New Version:");
 		GridBagConstraints gbc_lblUpdatedVersion = new GridBagConstraints();
@@ -126,17 +126,28 @@ import javax.swing.border.EmptyBorder;ch the application.
 		panel.add(txtVersion, gbc_txtVersion);
 		txtVersion.setColumns(10);
 
-		button = new JButton("...");
-		button.addActionListener(e -> {
+		cmdVersion = new JButton("...");
+		cmdVersion.addActionListener(e -> {
+			JDialog dlg = new JDialog(this, true);
 
+			JFileChooser chooser = new JFileChooser(new File(System.getProperty("user.dir")));
+			chooser.setAcceptAllFileFilterUsed(false);
+			chooser.addChoosableFileFilter(new FileNameExtensionFilter("Jar Upddates (*.jar)", "jar"));
+			chooser.setDialogTitle("Load New Version");
+			chooser.showOpenDialog(dlg);
+			if (chooser.getSelectedFile() == null) {
+				return;
+			}
+			newVersion = chooser.getSelectedFile();
+			txtVersion.setText(newVersion.toString());
 		});
-		button.setPreferredSize(new Dimension(23, 23));
-		button.setMinimumSize(new Dimension(23, 23));
-		button.setMaximumSize(new Dimension(23, 23));
-		GridBagConstraints gbc_button = new GridBagConstraints();
-		gbc_button.gridx = 1;
-		gbc_button.gridy = 0;
-		panel.add(button, gbc_button);
+		cmdVersion.setPreferredSize(new Dimension(23, 23));
+		cmdVersion.setMinimumSize(new Dimension(23, 23));
+		cmdVersion.setMaximumSize(new Dimension(23, 23));
+		GridBagConstraints gbc_cmdVersion = new GridBagConstraints();
+		gbc_cmdVersion.gridx = 1;
+		gbc_cmdVersion.gridy = 0;
+		panel.add(cmdVersion, gbc_cmdVersion);
 
 		lblUpdateName = new JLabel("Update Name:");
 		GridBagConstraints gbc_lblUpdateName = new GridBagConstraints();
@@ -156,13 +167,41 @@ import javax.swing.border.EmptyBorder;ch the application.
 		contentPanel.add(txtUpdateName, gbc_txtUpdateName);
 		txtUpdateName.setColumns(10);
 
-		btnLoad = new JButton("Load");
-		GridBagConstraints gbc_btnLoad = new GridBagConstraints();
-		gbc_btnLoad.anchor = GridBagConstraints.EAST;
-		gbc_btnLoad.gridx = 1;
-		gbc_btnLoad.gridy = 4;
-		contentPanel.add(btnLoad, gbc_btnLoad);
+		cmdLoad = new JButton("Load");
+		cmdLoad.addActionListener(e -> {
+			char[] keyStorePass = txtKeyStorePass.getPassword();
+			char[] updaterPass = txtUpdaterPass.getPassword();
+
+			if (keyStorePass.length == 0 || updaterPass.length == 0) {
+				Arrays.fill(keyStorePass, '0');
+				Arrays.fill(updaterPass, '0');
+				JOptionPane.showMessageDialog(this, "Passwords must not be blank.", "Updater", JOptionPane.WARNING_MESSAGE);
+				return;
+			}
+
+			if (newVersion == null) {
+				Arrays.fill(keyStorePass, '0');
+				Arrays.fill(updaterPass, '0');
+				JOptionPane.showMessageDialog(this, "Please select a new program version.", "Updater", JOptionPane.WARNING_MESSAGE);
+				return;
+			}
+
+			if (txtUpdateName.getText().isEmpty()) {
+				Arrays.fill(keyStorePass, '0');
+				Arrays.fill(updaterPass, '0');
+				JOptionPane.showMessageDialog(this, "Please enter an update name.", "Updater", JOptionPane.WARNING_MESSAGE);
+				return;
+			}
+		});
+		GridBagConstraints gbc_cmdLoad = new GridBagConstraints();
+		gbc_cmdLoad.anchor = GridBagConstraints.EAST;
+		gbc_cmdLoad.gridx = 1;
+		gbc_cmdLoad.gridy = 4;
+		contentPanel.add(cmdLoad, gbc_cmdLoad);
 		pack();
 	}
 
+	public void setStatus(String string) {
+
+	}
 }
