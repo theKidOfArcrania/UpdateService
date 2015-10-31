@@ -8,6 +8,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -64,13 +65,6 @@ public final class JarVerifier {
 	JarVerifier(URL jarURL) {
 		this.jarURL = jarURL;
 	}
-
-	// UNCOMMENT FOR TESTING AFTER YOU'VE REPLACED THE ABOVE CERT
-	// RAW BYTES WITH YOUR OWN.
-	// public static void main(String[] argv) {
-	// System.out.println("Integrity Checking? "
-	// + MyJCE.selfIntegrityChecking());
-	// }
 
 	/**
 	 * First, retrieve the jar file from the URL passed in constructor. Then, compare it to the expected X509Certificate. If everything went well and the certificates are the same, no exception is thrown.
@@ -130,9 +124,13 @@ public final class JarVerifier {
 		Enumeration<JarEntry> e = entriesVec.elements();
 
 		while (e.hasMoreElements()) {
-			JarEntry je = entries.nextElement();
-
-			OutputStream out = Files.newOutputStream(temp.resolve(je.getName()));
+			JarEntry je = e.nextElement();
+			Path entryPath = temp.resolve(je.getName());
+			if (je.getName().startsWith("META-INF")) {
+				continue; // Skip any META files.
+			}
+			Files.createDirectories(temp.resolve(je.getName()).getParent());
+			OutputStream out = Files.newOutputStream(entryPath, StandardOpenOption.CREATE);
 			InputStream in = jarFile.getInputStream(je);
 
 			// Read in each jar entry and copy to temp folder.
@@ -146,6 +144,8 @@ public final class JarVerifier {
 			}
 			out.close();
 			in.close();
+
+			Files.setLastModifiedTime(entryPath, je.getLastModifiedTime());
 		}
 
 		// Get the list of signer certificates

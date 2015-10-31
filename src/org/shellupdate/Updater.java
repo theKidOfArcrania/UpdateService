@@ -5,9 +5,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.util.Enumeration;
@@ -20,28 +19,33 @@ import java.util.jar.JarOutputStream;
 import javax.swing.JOptionPane;
 
 public class Updater {
-	private static Properties params;
+	private static final Properties params = new Properties();
 
 	public static void addUpdate(ProgressDialog progress, String updateName, File newShell, char[] keyStorePass, char[] updaterPass) {
 		try {
 			progress.setProgressText("Preparing to update.");
-			progress.setVisible(true);
-
 			params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
 			// Make sure that we can access the updater password.
 			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
 			if (keyStoreUrl == null) {
 				JOptionPane.showMessageDialog(progress, "Cannot find keystore.", "Updater", JOptionPane.ERROR_MESSAGE);
+				progress.setVisible(false);
 				return;
 			}
 
 			progress.setProgress(5);
 
-			KeyStore keyStore = KeyStore.getInstance("jks", "sun");
-			keyStore.load(keyStoreUrl.openStream(), keyStorePass);
-			keyStore.getKey("updater", updaterPass);
-
+			try {
+				KeyStore keyStore = KeyStore.getInstance("jks");
+				keyStore.load(keyStoreUrl.openStream(), keyStorePass);
+				keyStore.getKey("updater", updaterPass);
+			} catch (Exception e) {
+				e.printStackTrace();
+				JOptionPane.showMessageDialog(progress, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
+				progress.setVisible(false);
+				return;
+			}
 			progress.setProgress(10);
 
 			File oldShell = new File(params.getProperty("shell.path"));
@@ -62,65 +66,75 @@ public class Updater {
 			Enumeration<JarEntry> entries = newVersion.entries();
 			// Get size stuff and add directories.
 			while (entries.hasMoreElements()) {
-				JarEntry je = entries.nextElement();
+				JarEntry entry = entries.nextElement();
+				JarEntry oldEntry = oldVersion.getJarEntry(new String(entry.getName()));
 
-				long size = je.getSize();
-				entriesVec.addElement(je);
+				if (oldEntry == null || entry.getLastModifiedTime().compareTo(oldEntry.getLastModifiedTime()) > 0) {
+					long size = entry.getSize();
+					entriesVec.addElement(entry);
 
-				if (je.isDirectory()) {
-					continue;
-				}
+					if (entry.isDirectory()) {
+						continue;
+					}
 
-				if (size == -1) {
-					updateSize += 1000;
-				} else {
-					updateSize += size;
+					if (size == -1) {
+						updateSize += 1000;
+					} else {
+						updateSize += size;
+					}
 				}
 			}
 			ValueChange<Double> updateProgress = progress.progressProperty(.11, .9);
+			updateFile.getParentFile().mkdirs();
+			updateFile.createNewFile();
+
+			boolean changed = false;
+
 			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(updateFile))) {
 				for (JarEntry entry : entriesVec) {
-					JarEntry oldEntry = oldVersion.getJarEntry(entry.getName());
-					if (oldEntry == null || entry.getLastModifiedTime().compareTo(oldEntry.getLastModifiedTime()) > 0) {
-						jos.putNextEntry(entry);
-						progress.setProgressText("Adding " + entry.getName() + " to update.");
-						try (InputStream in = newVersion.getInputStream(entry)) {
-							while ((lenRead = in.read(buffer, 0, buffer.length)) != -1) {
-								jos.write(buffer, 0, lenRead);
-								updateRead += lenRead;
-								updateProgress.setValue((double) updateRead / updateSize);
-							}
-							jos.closeEntry();
+					changed = true;
+					jos.putNextEntry(entry);
+					progress.setProgressText("Adding " + entry.getName() + " to update.");
+					try (InputStream in = newVersion.getInputStream(entry)) {
+						while ((lenRead = in.read(buffer, 0, buffer.length)) != -1) {
+							jos.write(buffer, 0, lenRead);
+							updateRead += lenRead;
+							updateProgress.setValue((double) updateRead / updateSize);
 						}
-
-					} else if (!entry.isDirectory()) {
-						if (entry.getSize() == -1) {
-							updateSize += 1000;
-						} else {
-							updateSize += entry.getSize();
-						}
-						updateProgress.setValue((double) updateRead / updateSize);
+						jos.closeEntry();
 					}
 				}
 			}
 			oldVersion.close();
 			newVersion.close();
-			if (!oldShell.equals(newShell)) {
-				Files.move(newShell.toPath(), oldShell.toPath(), StandardCopyOption.REPLACE_EXISTING);
-			}
-			progress.setProgressText("Signing update file...");
+			if (changed) {
+				// Files.move(newShell.toPath(), oldShell.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				progress.setProgressText("Signing update file...");
 
-			sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), "-storepasswd", new String(updaterPass),
-					"-keypasswd", new String(keyStorePass), updateFile.toString(), "updater", });
-			System.exit(0);
+				sun.security.tools.jarsigner.Main.main(new String[] { "-keystore", keyStoreUrl.toExternalForm(), "-storepass", new String(keyStorePass),
+						"-keypass", new String(updaterPass), updateFile.toString(), "updater", });
+				System.exit(0);
+			} else {
+				updateFile.delete();
+				JOptionPane.showMessageDialog(progress, "New version has no changes made.", "Updater", JOptionPane.WARNING_MESSAGE);
+				progress.dispose();
+			}
+
 		} catch (KeyStoreException e) {
+			e.printStackTrace();
 			JOptionPane.showMessageDialog(progress, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
+			progress.dispose();
 		} catch (Exception e) {
-			JOptionPane.showMessageDialog(progress, "Unable to update jar: " + e.getMessage(), "Updater", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(progress, "Unable to update jar.", "Updater", JOptionPane.ERROR_MESSAGE);
+			progress.dispose();
 		}
 	}
 
 	public static void main(String[] args) throws IOException {
-
+		File userDir = new File(System.getProperty("user.dir"));
+		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log", userDir))));
+		UpdateProgressDialog dlg = new UpdateProgressDialog();
+		dlg.setVisible(true);
 	}
 }

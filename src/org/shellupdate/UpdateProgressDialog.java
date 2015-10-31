@@ -11,6 +11,7 @@ import java.util.Arrays;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -19,15 +20,12 @@ import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-public class UpdateProgressDialog extends JDialog {
+public class UpdateProgressDialog extends JFrame {
+	private static final long serialVersionUID = 428557334255651290L;
 
 	public static void main(String[] args) {
 		UpdateProgressDialog dlg = new UpdateProgressDialog();
 		dlg.setVisible(true);
-	}
-
-	private static void clearPass(char[] password) {
-
 	}
 
 	private final JPanel contentPanel = new JPanel();
@@ -192,6 +190,11 @@ public class UpdateProgressDialog extends JDialog {
 				JOptionPane.showMessageDialog(this, "Please enter an update name.", "Updater", JOptionPane.WARNING_MESSAGE);
 				return;
 			}
+			ProgressDialog progDlg = new ProgressDialog("Updater", this);
+			progDlg.setVisible(true);
+			Thread update = new Thread(() -> Updater.addUpdate(progDlg, txtUpdateName.getText(), newVersion, keyStorePass, updaterPass));
+			update.setDaemon(true);
+			update.start();
 		});
 		GridBagConstraints gbc_cmdLoad = new GridBagConstraints();
 		gbc_cmdLoad.anchor = GridBagConstraints.EAST;
@@ -199,9 +202,6 @@ public class UpdateProgressDialog extends JDialog {
 		gbc_cmdLoad.gridy = 4;
 		contentPanel.add(cmdLoad, gbc_cmdLoad);
 		pack();
-	}
-
-	public void setStatus(String string) {
-
+		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 	}
 }

@@ -7,7 +7,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.URL;
+import java.nio.file.CopyOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
@@ -17,9 +19,12 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
 import java.util.jar.JarEntry;
@@ -63,7 +68,7 @@ public class Shell {
 		// Make sure that the provider JAR file is signed with the "updater" signing certificate.
 		jv.verifyAndLoad(updateCert, tempUpgradePath, progress);
 
-		Files.move(tempUpgradePath, programPath, StandardCopyOption.REPLACE_EXISTING);
+		moveFolder(tempUpgradePath, programPath, StandardCopyOption.REPLACE_EXISTING);
 
 		return true;
 	}
@@ -74,19 +79,21 @@ public class Shell {
 			return new String[0];
 		}
 
-		DataInputStream dis = new DataInputStream(program.getInputStream(updateFiles));
-		int updatesLen = dis.readInt();
-		String[] updates = new String[updatesLen];
+		try (DataInputStream dis = new DataInputStream(program.getInputStream(updateFiles))) {
+			int updatesLen = dis.readInt();
+			String[] updates = new String[updatesLen];
 
-		for (int i = 0; i < updatesLen; i++) {
-			updates[i] = dis.readUTF();
+			for (int i = 0; i < updatesLen; i++) {
+				updates[i] = dis.readUTF();
+			}
+
+			return updates;
 		}
-
-		return updates;
 	}
 
 	public static void main(String[] args) throws IOException {
-		System.out.println(System.getProperty("user.dir"));
+		File userDir = new File(System.getProperty("user.dir"));
+		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log", userDir))));
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
 		String shellName = params.getProperty("shell.name");
@@ -103,107 +110,126 @@ public class Shell {
 		} catch (InterruptedException e) {
 		}
 
-		// Copy the contents of jar file into a temp directory.
-		copyTempFiles(shellJarFile, updShellPath, progDialog.progressProperty(0, .2));
-
+		// check for updates
 		boolean updated = false;
 		File updatePath = new File(params.getProperty("update.path"));
+
 		if (updatePath.exists()) {
 
 			// Get available updates
-			File[] updates = updatePath.listFiles(file -> file.getName().endsWith(".upd"));
-			String[] updatesName = Arrays.stream(updates).map(Shell::getUpdateName).toArray(String[]::new);
-			String[] version = getUpdates(shellJarFile);
-			Arrays.sort(updates, Comparator.comparing(File::lastModified));
-			Arrays.sort(version);
+			File[] availUpdates = updatePath.listFiles(file -> file.getName().endsWith(".upd"));
 
-			double applyProgress = .2;
-			double updateIncr = .8 / updates.length;
+			LinkedList<String> updatesBefore = new LinkedList<>();
+			ArrayList<File> updatesToDo = new ArrayList<>();
+			ArrayList<String> updatesCompleted = new ArrayList<>();
 
-			// loop through updates and apply them as it comes.
-			for (File update : updates) {
-				String updateName = getUpdateName(update);
-				if (Arrays.binarySearch(version, updateName) >= 0) {
-					applyProgress += updateIncr;
-					continue;
+			// Add available updates
+			updatesBefore.addAll(Arrays.asList(getUpdates(shellJarFile)));
+
+			for (File update : availUpdates) {
+				String updateName = Shell.getUpdateName(update);
+
+				if (!updatesBefore.isEmpty() && updatesBefore.remove(updateName)) {
+					// This version has this update already.
+					updatesCompleted.add(updateName);
+				} else {
+					// We need to add to the to-do-list of updates.
+					updatesToDo.add(update);
 				}
-
-				updated = true;
-				progDialog.setProgressText("Applying update " + updateName);
-
-				try {
-					doUpdate(update.toURI().toURL(), updShellPath, progDialog.progressProperty(applyProgress, applyProgress + updateIncr));
-				} catch (CertificateException | SecurityException e2) {
-					String errMsg = "Update " + updateName + " has failed to install due to some security issues.";
-					JOptionPane.showMessageDialog(progDialog, errMsg, shellName + " Updater", JOptionPane.ERROR_MESSAGE);
-					System.err.println(errMsg);
-					e2.printStackTrace();
-				}
-
-				applyProgress += updateIncr;
 			}
-			writeNewVersion(Files.newOutputStream(updShellPath.resolve("VERSION")), updatesName);
+
+			if (!updatesToDo.isEmpty()) {
+				updatesToDo.sort(Comparator.comparing(File::lastModified));
+
+				progDialog.setProgress(5);
+				progDialog.setProgressText("Preparing to update...");
+				// Explode the contents of jar file into a temp directory.
+				copyTempFiles(shellJarFile, updShellPath, progDialog.progressProperty(.05, .2));
+
+				double applyProgress = .2;
+				double updateIncr = .8 / updatesToDo.size();
+
+				// loop through updates and apply them as it comes.
+				for (File update : updatesToDo) {
+					String updateName = getUpdateName(update);
+
+					progDialog.setProgressText("Applying update " + updateName);
+					updatesCompleted.add(Shell.getUpdateName(update));
+
+					try {
+						doUpdate(update.toURI().toURL(), updShellPath, progDialog.progressProperty(applyProgress, applyProgress + updateIncr));
+						updated = true;
+					} catch (CertificateException | SecurityException e2) {
+						e2.printStackTrace();
+						String errMsg = "Update " + updateName + " has failed to install due to some security issues.";
+						JOptionPane.showMessageDialog(progDialog, errMsg, shellName + " Updater", JOptionPane.ERROR_MESSAGE);
+						System.err.println(errMsg);
+					}
+
+					applyProgress += updateIncr;
+
+				}
+				writeNewVersion(Files.newOutputStream(updShellPath.resolve("VERSION")), updatesCompleted);
+			}
 		}
 		shellJarFile.close();
 
+		// Copy the new updates back into the program jar file.
 		if (updated) {
 			progDialog.setProgressText("Copying update applies...");
+			boolean error[] = { false };
+
 			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile))) {
 				byte[] buffer = new byte[8192];
+				jos.setLevel(9);
 
-				Files.walk(updShellPath).forEach(path -> {
+				Files.walk(updShellPath).forEach(entryPath -> {
+					if (Files.isDirectory(entryPath)) {
+						return;
+					}
+
 					int lenRead;
 					try {
-						ZipEntry entry = new ZipEntry(path.relativize(updShellPath).toString());
+						ZipEntry entry = new ZipEntry(updShellPath.relativize(entryPath).toString());
+						entry.setLastModifiedTime(Files.getLastModifiedTime(entryPath));
 						jos.putNextEntry(entry);
-						try (InputStream in = Files.newInputStream(path)) {
+
+						try (InputStream in = Files.newInputStream(entryPath)) {
 							while ((lenRead = in.read(buffer, 0, buffer.length)) != -1) {
 								jos.write(buffer, 0, lenRead);
 							}
+						} finally {
 							jos.closeEntry();
 						}
+
+						Files.delete(entryPath);
 					} catch (IOException e) {
-						System.err.println("Unable to copy " + path.relativize(updShellPath) + "dir");
+						error[0] = true;
+						e.printStackTrace();
 					}
 				});
+			} finally {
+				if (error[0]) {
+					JOptionPane.showMessageDialog(progDialog, "Some files could not be copied...", "Updater", JOptionPane.ERROR_MESSAGE);
+				}
 			}
+
 		}
 
 		// Delete entire update folder.
-		Files.walkFileTree(updShellPath, new FileVisitor<Path>() {
-			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-				Files.delete(dir);
-				return FileVisitResult.CONTINUE;
-			}
-
-			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
-
-			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				Files.delete(file);
-				return FileVisitResult.CONTINUE;
-			}
-
-			@Override
-			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
-		});
-
-		Files.deleteIfExists(updShellPath);
+		deleteFolder(updShellPath);
 
 		progDialog.dispose();
+
+		// TO DO: shell program.
 	}
 
-	public static final void writeNewVersion(OutputStream out, String[] updates) throws IOException {
-		DataOutputStream dos = new DataOutputStream(out);
-		dos.writeInt(updates.length);
-		for (String update : updates) {
-			dos.writeUTF(update);
+	public static final void writeNewVersion(OutputStream out, List<String> updates) throws IOException {
+		try (DataOutputStream dos = new DataOutputStream(out)) {
+			dos.writeInt(updates.size());
+			for (String update : updates) {
+				dos.writeUTF(update);
+			}
 		}
 	}
 
@@ -222,7 +248,6 @@ public class Shell {
 
 			// Add directory
 			if (je.isDirectory()) {
-				System.out.println(je.getName());
 				Files.createDirectories(updShellPath.resolve(je.getName()));
 				continue;
 			}
@@ -259,6 +284,32 @@ public class Shell {
 		}
 	}
 
+	private static void deleteFolder(Path folder) throws IOException {
+		Files.walkFileTree(folder, new FileVisitor<Path>() {
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				Files.delete(dir);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				Files.delete(file);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+		});
+	}
+
 	private static String getUpdateName(File updateFile) {
 		String fileName = updateFile.getName();
 		return fileName.substring(0, fileName.length() - 4);
@@ -270,6 +321,33 @@ public class Shell {
 			X509Certificate cert = (X509Certificate) cf.generateCertificate(in);
 			return cert;
 		}
+	}
+
+	private static void moveFolder(Path src, Path dest, CopyOption... options) throws IOException {
+		Files.walkFileTree(src, new FileVisitor<Path>() {
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				Files.delete(dir);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				Files.createDirectories(dest.resolve(src.relativize(dir)));
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path srcFile, BasicFileAttributes attrs) throws IOException {
+				Files.move(srcFile, dest.resolve(src.relativize(srcFile)), options);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+		});
 	}
 
 	private Shell() {

@@ -24,10 +24,12 @@ public class ProgressDialog extends JDialog {
 		this(title, null);
 	}
 
+	/**
+	 * @wbp.parser.constructor
+	 */
 	public ProgressDialog(String title, Window owner) {
 		super(owner);
 		setTitle(title);
-		setBounds(100, 100, 450, 138);
 		getContentPane().setLayout(new BorderLayout());
 		contentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		getContentPane().add(contentPanel, BorderLayout.CENTER);
