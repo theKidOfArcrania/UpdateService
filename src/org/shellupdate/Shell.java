@@ -60,7 +60,7 @@ public class Shell {
 		// Open a connnection to the provider JAR file
 		JarVerifier jv = new JarVerifier(updateSource);
 
-		Path tempUpgradePath = Files.createTempDirectory("update");
+		Path tempUpgradePath = Files.createTempDirectory(params.getProperty("update.path"));
 		if (updateCert == null) {
 			updateCert = getUpdatesCert();
 		}
@@ -220,7 +220,8 @@ public class Shell {
 		deleteFolder(updShellPath);
 		progDialog.dispose();
 
-		// TO DO: shell program.
+		ProcessBuilder shell = new ProcessBuilder();
+		Process program = shell.command("java", "-jar", shellFile.getAbsolutePath()).start();
 	}
 
 	public static final void writeNewVersion(OutputStream out, List<String> updates) throws IOException {
