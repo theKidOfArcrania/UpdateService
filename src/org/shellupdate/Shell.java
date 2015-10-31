@@ -209,13 +209,12 @@ public class Shell {
 
 	private static void copyTempFiles(JarFile shellJarFile, Path updShellPath, ValueChange<Double> progress) throws IOException {
 
-		Vector<JarEntry> entriesVec = new Vector<>();
-
 		long totalShellSize = 0;
 		long copyShellSize = 0;
 
 		byte[] buffer = new byte[8192];
 		Enumeration<JarEntry> entries = shellJarFile.entries();
+		Vector<JarEntry> entriesVec = new Vector<>();
 
 		// Get size stuff and add directories.
 		while (entries.hasMoreElements()) {

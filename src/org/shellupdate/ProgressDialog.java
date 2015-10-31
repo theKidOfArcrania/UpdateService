@@ -4,6 +4,9 @@ import java.awt.BorderLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Window;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -18,6 +21,11 @@ public class ProgressDialog extends JDialog {
 	private final JProgressBar pbrLoading;
 
 	public ProgressDialog(String title) {
+		this(title, null);
+	}
+
+	public ProgressDialog(String title, Window owner) {
+		super(owner);
 		setTitle(title);
 		setBounds(100, 100, 450, 138);
 		getContentPane().setLayout(new BorderLayout());
@@ -47,6 +55,12 @@ public class ProgressDialog extends JDialog {
 		contentPanel.add(pbrLoading, gbc_pbrLoading);
 
 		pack();
+		this.addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowOpened(WindowEvent evt) {
+				setLocationRelativeTo(null);
+			}
+		});
 	}
 
 	public int getProgress() {
