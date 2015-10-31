@@ -191,10 +191,11 @@ public class UpdateProgressDialog extends JFrame {
 				return;
 			}
 			ProgressDialog progDlg = new ProgressDialog("Updater", this);
-			progDlg.setVisible(true);
 			Thread update = new Thread(() -> Updater.addUpdate(progDlg, txtUpdateName.getText(), newVersion, keyStorePass, updaterPass));
 			update.setDaemon(true);
 			update.start();
+			progDlg.setModal(true);
+			progDlg.setVisible(true);
 		});
 		GridBagConstraints gbc_cmdLoad = new GridBagConstraints();
 		gbc_cmdLoad.anchor = GridBagConstraints.EAST;

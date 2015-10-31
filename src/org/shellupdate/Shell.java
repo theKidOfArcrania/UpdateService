@@ -190,7 +190,7 @@ public class Shell {
 
 					int lenRead;
 					try {
-						ZipEntry entry = new ZipEntry(updShellPath.relativize(entryPath).toString());
+						ZipEntry entry = new ZipEntry(updShellPath.relativize(entryPath).toString().replace('\\', '/'));
 						entry.setLastModifiedTime(Files.getLastModifiedTime(entryPath));
 						jos.putNextEntry(entry);
 
@@ -218,7 +218,6 @@ public class Shell {
 
 		// Delete entire update folder.
 		deleteFolder(updShellPath);
-
 		progDialog.dispose();
 
 		// TO DO: shell program.

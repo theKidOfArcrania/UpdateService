@@ -29,6 +29,7 @@ public class ProgressDialog extends JDialog {
 	 */
 	public ProgressDialog(String title, Window owner) {
 		super(owner);
+		setEnabled(false);
 		setTitle(title);
 		getContentPane().setLayout(new BorderLayout());
 		contentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));

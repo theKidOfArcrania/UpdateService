@@ -24,7 +24,6 @@ public class Updater {
 	public static void addUpdate(ProgressDialog progress, String updateName, File newShell, char[] keyStorePass, char[] updaterPass) {
 		try {
 			progress.setProgressText("Preparing to update.");
-			params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
 			// Make sure that we can access the updater password.
 			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
@@ -67,15 +66,25 @@ public class Updater {
 			// Get size stuff and add directories.
 			while (entries.hasMoreElements()) {
 				JarEntry entry = entries.nextElement();
-				JarEntry oldEntry = oldVersion.getJarEntry(new String(entry.getName()));
+				JarEntry oldEntry = oldVersion.getJarEntry(entry.getName());
+
+				if (oldEntry == null) {
+					// Retrieve entries with back-slashes instead of forward slashes?
+					oldEntry = oldVersion.getJarEntry(entry.getName().replace('/', '\\'));
+				}
+
+				if (entry.getName().equalsIgnoreCase("VERSION")) {
+					continue;
+				}
 
 				if (oldEntry == null || entry.getLastModifiedTime().compareTo(oldEntry.getLastModifiedTime()) > 0) {
 					long size = entry.getSize();
-					entriesVec.addElement(entry);
 
 					if (entry.isDirectory()) {
 						continue;
 					}
+
+					entriesVec.addElement(entry);
 
 					if (size == -1) {
 						updateSize += 1000;
@@ -107,6 +116,7 @@ public class Updater {
 			}
 			oldVersion.close();
 			newVersion.close();
+
 			if (changed) {
 				// Files.move(newShell.toPath(), oldShell.toPath(), StandardCopyOption.REPLACE_EXISTING);
 				progress.setProgressText("Signing update file...");
@@ -132,6 +142,7 @@ public class Updater {
 	}
 
 	public static void main(String[] args) throws IOException {
+		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 		File userDir = new File(System.getProperty("user.dir"));
 		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log", userDir))));
 		UpdateProgressDialog dlg = new UpdateProgressDialog();
