@@ -112,6 +112,12 @@ public class Shell {
 		boolean updated = false;
 		Version current = new Version();
 
+		if (!shellFile.exists()) {
+			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile))) {
+				// Create an empty directory.
+			}
+		}
+
 		try (JarFile shellJarFile = new JarFile(shellFile)) {
 			try {
 				SplashLoadDialog progDlg = new SplashLoadDialog(null, ImageHelper.loadImage("org/shellupdate/About.png"));
