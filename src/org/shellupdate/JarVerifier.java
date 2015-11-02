@@ -1,5 +1,6 @@
 package org.shellupdate;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -71,7 +72,7 @@ public final class JarVerifier {
 	 *
 	 * @param valueChange
 	 */
-	public void verifyAndLoad(X509Certificate targetCert, Path temp, ValueChange<Double> valueChange) throws IOException {
+	public Version verifyAndLoad(X509Certificate targetCert, Path temp, ValueChange<Double> valueChange) throws IOException {
 		// Sanity checking
 		if (targetCert == null) {
 			throw new SecurityException("Provider certificate is invalid");
@@ -122,13 +123,19 @@ public final class JarVerifier {
 		}
 
 		Enumeration<JarEntry> e = entriesVec.elements();
-
+		Version current = new Version();
 		while (e.hasMoreElements()) {
 			JarEntry je = e.nextElement();
 			Path entryPath = temp.resolve(je.getName());
 			if (je.getName().startsWith("META-INF")) {
 				continue; // Skip any META files.
 			}
+
+			if (je.getName().equalsIgnoreCase("VERSION")) {
+				current.readVersion(new DataInputStream(jarFile.getInputStream(je)));
+				continue; // Skip the version file
+			}
+
 			Files.createDirectories(temp.resolve(je.getName()).getParent());
 			OutputStream out = Files.newOutputStream(entryPath, StandardOpenOption.CREATE);
 			InputStream in = jarFile.getInputStream(je);
@@ -183,6 +190,7 @@ public final class JarVerifier {
 				}
 			}
 		}
+		return current;
 	}
 
 	/**

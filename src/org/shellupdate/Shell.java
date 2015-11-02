@@ -1,5 +1,6 @@
 package org.shellupdate;
 
+import java.awt.Component;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -33,6 +34,8 @@ import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
 import javax.swing.JOptionPane;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
 public class Shell {
 
@@ -46,16 +49,13 @@ public class Shell {
 	 * @param updateSource the new jar source update for the program
 	 * @param programPath the path of current program to update
 	 * @param progress the progress monitor variable.
-	 * @return true if it is verified, false if it is not verified.
+	 * @return the version of this update
 	 * @throws IOException if an I/O exception occurs
 	 * @throws CertificateException if the updates certification cannot be loaded
 	 * @throws SecurityException if a verification error occurs.
 	 */
-	public static final synchronized boolean doUpdate(URL updateSource, Path programPath, ValueChange<Double> progress)
+	public static final synchronized Version doUpdate(URL updateSource, Path programPath, ValueChange<Double> progress)
 			throws CertificateException, IOException, SecurityException {
-		if (updateSource == null) {
-			return false;
-		}
 
 		// Open a connnection to the provider JAR file
 		JarVerifier jv = new JarVerifier(updateSource);
@@ -66,20 +66,19 @@ public class Shell {
 		}
 
 		// Make sure that the provider JAR file is signed with the "updater" signing certificate.
-		jv.verifyAndLoad(updateCert, tempUpgradePath, progress);
-
+		Version current = jv.verifyAndLoad(updateCert, tempUpgradePath, progress);
 		moveFolder(tempUpgradePath, programPath, StandardCopyOption.REPLACE_EXISTING);
-
-		return true;
+		return current;
 	}
 
-	public static final String[] getUpdates(JarFile program) throws IOException {
+	public static final String[] getUpdates(JarFile program, Version current) throws IOException {
 		JarEntry updateFiles = program.getJarEntry("VERSION");
 		if (updateFiles == null) {
 			return new String[0];
 		}
 
 		try (DataInputStream dis = new DataInputStream(program.getInputStream(updateFiles))) {
+			current.readVersion(dis);
 			int updatesLen = dis.readInt();
 			String[] updates = new String[updatesLen];
 
@@ -92,91 +91,116 @@ public class Shell {
 	}
 
 	public static void main(String[] args) throws IOException {
-		File userDir = new File(System.getProperty("user.dir"));
-		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log", userDir))));
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log"))));
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
 		String shellName = params.getProperty("shell.name");
 		File shellFile = new File(params.getProperty("shell.path"));
-		JarFile shellJarFile = new JarFile(shellFile);
+		ProgressViewer progView;
+
 		Path updShellPath = Files.createTempDirectory("program");
-
-		ProgressDialog progDialog = new ProgressDialog("Opening " + shellName);
-		progDialog.setVisible(true);
-		progDialog.setProgressText("Fetching updates...");
-
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-		}
-
-		// check for updates
 		boolean updated = false;
-		File updatePath = new File(params.getProperty("update.path"));
+		Version current = new Version();
 
-		if (updatePath.exists()) {
+		try (JarFile shellJarFile = new JarFile(shellFile)) {
+			current.readVersion(new DataInputStream(shellJarFile.getInputStream(shellJarFile.getEntry("VERSION"))));
 
-			// Get available updates
-			File[] availUpdates = updatePath.listFiles(file -> file.getName().endsWith(".upd"));
-
-			LinkedList<String> updatesBefore = new LinkedList<>();
-			ArrayList<File> updatesToDo = new ArrayList<>();
-			ArrayList<String> updatesCompleted = new ArrayList<>();
-
-			// Add available updates
-			updatesBefore.addAll(Arrays.asList(getUpdates(shellJarFile)));
-
-			for (File update : availUpdates) {
-				String updateName = Shell.getUpdateName(update);
-
-				if (!updatesBefore.isEmpty() && updatesBefore.remove(updateName)) {
-					// This version has this update already.
-					updatesCompleted.add(updateName);
-				} else {
-					// We need to add to the to-do-list of updates.
-					updatesToDo.add(update);
-				}
+			try {
+				SplashLoadDialog progDlg = new SplashLoadDialog(null, ImageHelper.loadImage("org/shellupdate/About.png"));
+				progDlg.setVisible(true);
+				progView = progDlg;
+			} catch (IOException e1) {
+				e1.printStackTrace();
+				ProgressDialog progDlg = new ProgressDialog(null, "Opening " + params.getProperty("shell.name", "program"));
+				progDlg.setVisible(true);
+				progView = progDlg;
 			}
 
-			if (!updatesToDo.isEmpty()) {
-				updatesToDo.sort(Comparator.comparing(File::lastModified));
+			progView.setProgress(1);
+			progView.setProgressText("Fetching updates");
 
-				progDialog.setProgress(5);
-				progDialog.setProgressText("Preparing to update...");
-				// Explode the contents of jar file into a temp directory.
-				copyTempFiles(shellJarFile, updShellPath, progDialog.progressProperty(.05, .2));
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+			}
 
-				double applyProgress = .2;
-				double updateIncr = .8 / updatesToDo.size();
+			// check for updates
+			File updatePath = new File(params.getProperty("update.path"));
 
-				// loop through updates and apply them as it comes.
-				for (File update : updatesToDo) {
-					String updateName = getUpdateName(update);
+			if (updatePath.exists()) {
 
-					progDialog.setProgressText("Applying update " + updateName);
-					updatesCompleted.add(Shell.getUpdateName(update));
+				// Get available updates
+				File[] availUpdates = updatePath.listFiles(file -> file.getName().endsWith(".upd"));
 
-					try {
-						doUpdate(update.toURI().toURL(), updShellPath, progDialog.progressProperty(applyProgress, applyProgress + updateIncr));
-						updated = true;
-					} catch (CertificateException | SecurityException e2) {
-						e2.printStackTrace();
-						String errMsg = "Update " + updateName + " has failed to install due to some security issues.";
-						JOptionPane.showMessageDialog(progDialog, errMsg, shellName + " Updater", JOptionPane.ERROR_MESSAGE);
-						System.err.println(errMsg);
+				LinkedList<String> updatesBefore = new LinkedList<>();
+				ArrayList<File> updatesToDo = new ArrayList<>();
+				ArrayList<String> updatesCompleted = new ArrayList<>();
+
+				// Get updates that we already have.
+				updatesBefore.addAll(Arrays.asList(getUpdates(shellJarFile, current)));
+
+				// Catelog updates
+				for (File update : availUpdates) {
+					String updateName = Shell.getUpdateName(update);
+
+					if (!updatesBefore.isEmpty() && updatesBefore.remove(updateName)) {
+						// This version has this update already.
+						updatesCompleted.add(updateName);
+					} else {
+						// We need to add to the to-do-list of updates.
+						updatesToDo.add(update);
 					}
-
-					applyProgress += updateIncr;
-
 				}
-				writeNewVersion(Files.newOutputStream(updShellPath.resolve("VERSION")), updatesCompleted);
+
+				if (!updatesToDo.isEmpty()) {
+					updatesToDo.sort(Comparator.comparing(File::lastModified));
+
+					progView.setProgress(5);
+					progView.setProgressText("Preparing to update...");
+					// Explode the contents of jar file into a temp directory.
+					copyTempFiles(shellJarFile, updShellPath, progView.progressProperty(.05, .2));
+
+					double applyProgress = .2;
+					double updateIncr = .8 / updatesToDo.size();
+
+					// loop through updates and apply them as it comes.
+					for (File update : updatesToDo) {
+						String updateName = getUpdateName(update);
+
+						progView.setProgressText("Applying update " + updateName);
+						updatesCompleted.add(Shell.getUpdateName(update));
+
+						try {
+							Version updateVersion = doUpdate(update.toURI().toURL(), updShellPath, progView.progressProperty(applyProgress, applyProgress
+									+ updateIncr));
+							current = Version.latestVersion(current, updateVersion);
+							updated = true;
+						} catch (CertificateException | SecurityException e2) {
+							e2.printStackTrace();
+							String errMsg = "Update " + updateName + " has failed to install due to some security issues.";
+							JOptionPane.showMessageDialog((Component) progView, errMsg, shellName + " Updater", JOptionPane.ERROR_MESSAGE);
+							System.err.println(errMsg);
+						}
+
+						applyProgress += updateIncr;
+
+					}
+					writeNewVersion(Files.newOutputStream(updShellPath.resolve("VERSION")), current, updatesCompleted);
+				}
+			} else {
+				progView.setProgress(30);
 			}
 		}
-		shellJarFile.close();
 
 		// Copy the new updates back into the program jar file.
 		if (updated) {
-			progDialog.setProgressText("Copying update applies...");
+			progView.setProgressText("Copying update applies...");
 			boolean error[] = { false };
 
 			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile))) {
@@ -210,7 +234,7 @@ public class Shell {
 				});
 			} finally {
 				if (error[0]) {
-					JOptionPane.showMessageDialog(progDialog, "Some files could not be copied...", "Updater", JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog((Component) progView, "Some files could not be copied...", "Updater", JOptionPane.ERROR_MESSAGE);
 				}
 			}
 
@@ -218,14 +242,16 @@ public class Shell {
 
 		// Delete entire update folder.
 		deleteFolder(updShellPath);
-		progDialog.dispose();
+		progView.finish();
 
 		ProcessBuilder shell = new ProcessBuilder();
-		Process program = shell.command("java", "-jar", shellFile.getAbsolutePath()).start();
+
+		Process program = shell.command("java", "-jar", shellFile.getAbsolutePath()).inheritIO().start();
 	}
 
-	public static final void writeNewVersion(OutputStream out, List<String> updates) throws IOException {
+	public static final void writeNewVersion(OutputStream out, Version current, List<String> updates) throws IOException {
 		try (DataOutputStream dos = new DataOutputStream(out)) {
+			current.writeVersion(dos);
 			dos.writeInt(updates.size());
 			for (String update : updates) {
 				dos.writeUTF(update);

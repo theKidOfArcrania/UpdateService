@@ -1,5 +1,8 @@
 package org.shellupdate;
 
+import java.awt.Component;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -15,36 +18,25 @@ import java.util.Vector;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.zip.ZipEntry;
 
 import javax.swing.JOptionPane;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
 public class Updater {
-	private static final Properties params = new Properties();
+	public static final Properties params = new Properties();
 
-	public static void addUpdate(ProgressDialog progress, String updateName, File newShell, char[] keyStorePass, char[] updaterPass) {
+	public static void addUpdate(ProgressViewer progress, String updateName, File newShell, Version latest, char[] keyStorePass, char[] updaterPass) {
 		try {
+			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
 			progress.setProgressText("Preparing to update.");
 
-			// Make sure that we can access the updater password.
-			URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
-			if (keyStoreUrl == null) {
-				JOptionPane.showMessageDialog(progress, "Cannot find keystore.", "Updater", JOptionPane.ERROR_MESSAGE);
-				progress.setVisible(false);
+			if (!verifyUpdateID((Component) progress, keyStorePass, updaterPass)) {
+				progress.finish();
 				return;
 			}
 
-			progress.setProgress(5);
-
-			try {
-				KeyStore keyStore = KeyStore.getInstance("jks");
-				keyStore.load(keyStoreUrl.openStream(), keyStorePass);
-				keyStore.getKey("updater", updaterPass);
-			} catch (Exception e) {
-				e.printStackTrace();
-				JOptionPane.showMessageDialog(progress, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
-				progress.setVisible(false);
-				return;
-			}
 			progress.setProgress(10);
 
 			File oldShell = new File(params.getProperty("shell.path"));
@@ -113,6 +105,8 @@ public class Updater {
 						jos.closeEntry();
 					}
 				}
+				jos.putNextEntry(new ZipEntry("VERSION"));
+				latest.writeVersion(new DataOutputStream(jos));
 			}
 			oldVersion.close();
 			newVersion.close();
@@ -126,26 +120,85 @@ public class Updater {
 				System.exit(0);
 			} else {
 				updateFile.delete();
-				JOptionPane.showMessageDialog(progress, "New version has no changes made.", "Updater", JOptionPane.WARNING_MESSAGE);
-				progress.dispose();
+				JOptionPane.showMessageDialog((Component) progress, "New version has no changes made.", "Updater", JOptionPane.WARNING_MESSAGE);
+				progress.finish();
 			}
 
 		} catch (KeyStoreException e) {
 			e.printStackTrace();
-			JOptionPane.showMessageDialog(progress, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
-			progress.dispose();
+			JOptionPane.showMessageDialog((Component) progress, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
+			progress.finish();
 		} catch (Exception e) {
 			e.printStackTrace();
-			JOptionPane.showMessageDialog(progress, "Unable to update jar.", "Updater", JOptionPane.ERROR_MESSAGE);
-			progress.dispose();
+			JOptionPane.showMessageDialog((Component) progress, "Unable to update jar.", "Updater", JOptionPane.ERROR_MESSAGE);
+			progress.finish();
 		}
 	}
 
+	public static Version getLastestVersion() {
+		String updatePath = Updater.params.getProperty("update.path");
+		if (updatePath != null) {
+			File updateFile = new File(updatePath);
+			File[] availUpdates = updateFile.listFiles(file -> file.getName().endsWith(".upd"));
+
+			if (availUpdates == null) {
+				return new Version(1, 0, 1, false);
+			} else {
+				Version max = new Version(1, 0, availUpdates.length + 1, false);
+				for (File availUpdate : availUpdates) {
+					try {
+						JarFile update = new JarFile(availUpdate, false);
+						ZipEntry versionFile = update.getEntry("VERSION");
+						DataInputStream dis = new DataInputStream(update.getInputStream(versionFile));
+
+						Version version = new Version();
+						version.readVersion(dis);
+						max = Version.latestVersion(max, version);
+					} catch (Exception e) {
+						e.printStackTrace();
+						// Silently ignore any errors. We don't care about them at this point.
+					}
+				}
+				return max;
+			}
+		} else {
+			return new Version();
+		}
+	}
+
+	@SuppressWarnings("resource")
 	public static void main(String[] args) throws IOException {
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
-		File userDir = new File(System.getProperty("user.dir"));
-		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log", userDir))));
-		UpdateProgressDialog dlg = new UpdateProgressDialog();
+		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log"))));
+		UpdateDialog dlg = new UpdateDialog();
 		dlg.setVisible(true);
+	}
+
+	public static boolean verifyUpdateID(Component parent, char[] keyStorePass, char[] updaterPass) {
+		// Make sure that we can access the updater password.
+		URL keyStoreUrl = ClassLoader.getSystemResource(".keystore");
+		if (keyStoreUrl == null) {
+			JOptionPane.showMessageDialog(parent, "Cannot find keystore.", "Updater", JOptionPane.ERROR_MESSAGE);
+			return false;
+		}
+
+		try {
+			KeyStore keyStore = KeyStore.getInstance("jks");
+			keyStore.load(keyStoreUrl.openStream(), keyStorePass);
+			keyStore.getKey("updater", updaterPass);
+		} catch (Exception e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(parent, "Incorrect Password", "Updater", JOptionPane.WARNING_MESSAGE);
+
+			return false;
+		}
+		return true;
 	}
 }

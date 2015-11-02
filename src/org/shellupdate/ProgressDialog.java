@@ -14,20 +14,16 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.border.EmptyBorder;
 
-public class ProgressDialog extends JDialog {
+public class ProgressDialog extends JDialog implements ProgressViewer {
 	private final JPanel contentPanel = new JPanel();
 
 	private final JLabel lblProgress;
 	private final JProgressBar pbrLoading;
 
-	public ProgressDialog(String title) {
-		this(title, null);
-	}
-
 	/**
 	 * @wbp.parser.constructor
 	 */
-	public ProgressDialog(String title, Window owner) {
+	public ProgressDialog(Window owner, String title) {
 		super(owner);
 		setEnabled(false);
 		setTitle(title);
@@ -66,40 +62,27 @@ public class ProgressDialog extends JDialog {
 		});
 	}
 
+	@Override
+	public void finish() {
+		this.dispose();
+	}
+
+	@Override
 	public int getProgress() {
 		return pbrLoading.getValue();
 	}
 
+	@Override
 	public String getProgressText() {
 		return lblProgress.getText();
 	}
 
-	public ValueChange<Double> progressProperty() {
-		return progressProperty(0.0, 1.0);
-	}
-
-	public ValueChange<Double> progressProperty(double start, double end) {
-		if (end < start || start < 0 || end > 1) {
-			throw new IllegalArgumentException("start and end must be between 0 and 1 inclusive where end is greater than start");
-		}
-		return new ValueChange<Double>() {
-
-			@Override
-			public Double getValue() {
-				return (pbrLoading.getValue() / 100.0 - start) / (end - start);
-			}
-
-			@Override
-			public void setValue(Double newValue) {
-				pbrLoading.setValue((int) ((newValue * (end - start) + start) * 100));
-			}
-		};
-	}
-
+	@Override
 	public void setProgress(int percent) {
 		pbrLoading.setValue(Math.min(100, Math.max(0, percent)));
 	}
 
+	@Override
 	public void setProgressText(String progress) {
 		lblProgress.setText(progress);
 	}
