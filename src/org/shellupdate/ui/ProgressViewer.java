@@ -1,4 +1,6 @@
-package org.shellupdate;
+package org.shellupdate.ui;
+
+import org.shellupdate.ValueChange;
 
 public interface ProgressViewer {
 	public default ValueChange<Double> progressProperty() {

@@ -24,6 +24,9 @@ import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.shellupdate.ui.ProgressViewer;
+import org.shellupdate.ui.UpdateDialog;
+
 public class Updater {
 	public static final Properties params = new Properties();
 
@@ -153,12 +156,14 @@ public class Updater {
 
 						Version version = new Version();
 						version.readVersion(dis);
+						version.increment();
 						max = Version.latestVersion(max, version);
 					} catch (Exception e) {
 						e.printStackTrace();
 						// Silently ignore any errors. We don't care about them at this point.
 					}
 				}
+
 				return max;
 			}
 		} else {

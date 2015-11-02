@@ -1,4 +1,4 @@
-package org.shellupdate;
+package org.shellupdate.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -14,6 +14,8 @@ import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.WindowConstants;
+
+import org.shellupdate.ImageHelper;
 
 @SuppressWarnings("serial")
 public class SplashLoadDialog extends JDialog implements ProgressViewer {

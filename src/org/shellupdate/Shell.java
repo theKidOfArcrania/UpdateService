@@ -37,6 +37,10 @@ import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.shellupdate.ui.ProgressDialog;
+import org.shellupdate.ui.ProgressViewer;
+import org.shellupdate.ui.SplashLoadDialog;
+
 public class Shell {
 
 	private static Properties params = new Properties();
@@ -109,8 +113,6 @@ public class Shell {
 		Version current = new Version();
 
 		try (JarFile shellJarFile = new JarFile(shellFile)) {
-			current.readVersion(new DataInputStream(shellJarFile.getInputStream(shellJarFile.getEntry("VERSION"))));
-
 			try {
 				SplashLoadDialog progDlg = new SplashLoadDialog(null, ImageHelper.loadImage("org/shellupdate/About.png"));
 				progDlg.setVisible(true);
@@ -123,7 +125,7 @@ public class Shell {
 			}
 
 			progView.setProgress(1);
-			progView.setProgressText("Fetching updates");
+			progView.setProgressText("Fetching updates...");
 
 			try {
 				Thread.sleep(1000);
@@ -173,7 +175,7 @@ public class Shell {
 					for (File update : updatesToDo) {
 						String updateName = getUpdateName(update);
 
-						progView.setProgressText("Applying update " + updateName);
+						progView.setProgressText("Applying update " + updateName + ".");
 						updatesCompleted.add(Shell.getUpdateName(update));
 
 						try {

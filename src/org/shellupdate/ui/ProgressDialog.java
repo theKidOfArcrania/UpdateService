@@ -1,4 +1,4 @@
-package org.shellupdate;
+package org.shellupdate.ui;
 
 import java.awt.BorderLayout;
 import java.awt.GridBagConstraints;
