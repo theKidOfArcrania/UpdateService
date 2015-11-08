@@ -177,9 +177,7 @@ public class Shell {
 						updatesCompleted.add(Shell.getUpdateName(update));
 
 						try {
-							Version updateVersion = doUpdate(update.toURI().toURL(), updShellPath, progView.progressProperty(applyProgress, applyProgress
-									+ updateIncr));
-							current = Version.latestVersion(current, updateVersion);
+							current = doUpdate(update.toURI().toURL(), updShellPath, progView.progressProperty(applyProgress, applyProgress + updateIncr));
 							updated = true;
 						} catch (CertificateException | SecurityException e2) {
 							e2.printStackTrace();
