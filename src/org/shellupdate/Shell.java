@@ -94,7 +94,7 @@ public class Shell {
 		}
 	}
 
-	public static void main(String[] args) throws IOException {
+	public static void run(String[] args) throws IOException {
 		try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
