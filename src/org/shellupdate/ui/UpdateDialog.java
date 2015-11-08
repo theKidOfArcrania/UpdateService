@@ -1,4 +1,4 @@
-package org.shellupdate;
+package org.shellupdate.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -26,6 +26,9 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.PlainDocument;
+
+import org.shellupdate.Updater;
+import org.shellupdate.Version;
 
 public class UpdateDialog extends JFrame {
 	public class NumberLimitedDocument extends PlainDocument {
@@ -63,14 +66,14 @@ public class UpdateDialog extends JFrame {
 	private final JPasswordField txtKeyStorePass;
 	private final JPasswordField txtUpdaterPass;
 	private final JLabel lblUpdatedVersion;
-	private final JButton cmdLoad;
+	private JButton cmdLoad;
 	private final JPanel panel;
 	private JTextField txtVersion = null;
 	private final JButton cmdVersion;
 
 	private final JLabel lblUpdateName;
 
-	private final JTextField txtUpdateName;
+	private JTextField txtUpdateName;
 	private File newVersion;
 	private JLabel lblVersionNum;
 	private JPanel pnlVersion;
@@ -141,6 +144,11 @@ public class UpdateDialog extends JFrame {
 		contentPanel.add(lblKeyStorePass, gbc_lblKeyStorePass);
 
 		txtKeyStorePass = new JPasswordField();
+		txtKeyStorePass.addActionListener(e -> {
+			if (cmdLoad.isEnabled()) {
+				verifyDialog();
+			}
+		});
 		GridBagConstraints gbc_txtKeyStorePass = new GridBagConstraints();
 		gbc_txtKeyStorePass.insets = new Insets(5, 0, 10, 0);
 		gbc_txtKeyStorePass.fill = GridBagConstraints.HORIZONTAL;
@@ -159,6 +167,11 @@ public class UpdateDialog extends JFrame {
 		contentPanel.add(lblUpdaterPass, gbc_lblUpdaterPass);
 
 		txtUpdaterPass = new JPasswordField();
+		txtUpdaterPass.addActionListener(e -> {
+			if (cmdLoad.isEnabled()) {
+				verifyDialog();
+			}
+		});
 		GridBagConstraints gbc_txtUpdaterPass = new GridBagConstraints();
 		gbc_txtUpdaterPass.insets = new Insets(0, 0, 5, 0);
 		gbc_txtUpdaterPass.fill = GridBagConstraints.HORIZONTAL;
@@ -216,6 +229,9 @@ public class UpdateDialog extends JFrame {
 			txtVersion.setText(newVersion.toString());
 
 			if (!txtVersion.isEnabled()) {
+				txtUpdateName.setEnabled(true);
+				txtUpdateName.requestFocusInWindow();
+
 				txtVersion.setEnabled(true);
 				txtVerMajor.setEnabled(true);
 				txtVerMinor.setEnabled(true);
@@ -259,36 +275,7 @@ public class UpdateDialog extends JFrame {
 
 		cmdLoad = new JButton("Verify");
 		cmdLoad.setEnabled(false);
-		cmdLoad.addActionListener(e -> {
-			char[] keyStorePass = txtKeyStorePass.getPassword();
-			char[] updaterPass = txtUpdaterPass.getPassword();
-			if (verifying) {
-				if (Updater.verifyUpdateID(this, keyStorePass, updaterPass)) {
-					verifying = false;
-					cmdLoad.setEnabled(false);
-					txtKeyStorePass.setEnabled(false);
-					txtUpdaterPass.setEnabled(false);
-					cmdVersion.setEnabled(true);
-					cmdLoad.setText("Add Update");
-					JOptionPane.showMessageDialog(this, "Access granted.", "Updater", JOptionPane.INFORMATION_MESSAGE);
-				}
-			} else {
-				ProgressDialog progDlg = new ProgressDialog(this, "Updater");
-
-				// Parse versioning.
-				int major = Integer.parseInt(txtVerMajor.getText());
-				int minor = Integer.parseInt(txtVerMinor.getText());
-				int build = Integer.parseInt(txtVerUpdate.getText());
-				boolean beta = chkBeta.isSelected();
-				Version version = new Version(major, minor, build, beta);
-
-				Thread update = new Thread(() -> Updater.addUpdate(progDlg, txtUpdateName.getText(), newVersion, version, keyStorePass, updaterPass));
-				update.setDaemon(true);
-				update.start();
-				progDlg.setModal(true);
-				progDlg.setVisible(true);
-			}
-		});
+		cmdLoad.addActionListener(e -> verifyDialog());
 
 		lblVersionNum = new JLabel("Version Num:");
 		GridBagConstraints gbc_lblVersionNum = new GridBagConstraints();
@@ -379,5 +366,38 @@ public class UpdateDialog extends JFrame {
 		contentPanel.add(cmdLoad, gbc_cmdLoad);
 		pack();
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+	}
+
+	private void verifyDialog() {
+
+		char[] keyStorePass = txtKeyStorePass.getPassword();
+		char[] updaterPass = txtUpdaterPass.getPassword();
+		if (verifying) {
+			if (Updater.verifyUpdateID(this, keyStorePass, updaterPass)) {
+				verifying = false;
+				cmdLoad.setEnabled(false);
+				txtKeyStorePass.setEnabled(false);
+				txtUpdaterPass.setEnabled(false);
+				cmdVersion.setEnabled(true);
+				cmdLoad.setText("Add Update");
+				JOptionPane.showMessageDialog(this, "Access granted.", "Updater", JOptionPane.INFORMATION_MESSAGE);
+			}
+		} else {
+			ProgressDialog progDlg = new ProgressDialog(this, "Updater");
+
+			// Parse versioning.
+			int major = Integer.parseInt(txtVerMajor.getText());
+			int minor = Integer.parseInt(txtVerMinor.getText());
+			int build = Integer.parseInt(txtVerUpdate.getText());
+			boolean beta = chkBeta.isSelected();
+			Version version = new Version(major, minor, build, beta);
+
+			Thread update = new Thread(() -> Updater.addUpdate(progDlg, txtUpdateName.getText(), newVersion, version, keyStorePass, updaterPass));
+			update.setDaemon(true);
+			update.start();
+			progDlg.setModal(true);
+			progDlg.setVisible(true);
+		}
+
 	}
 }

@@ -4,15 +4,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-public class Version {
+public class Version implements Cloneable, Comparable<Version> {
 
 	public static Version latestVersion(Version a, Version b) {
-		if (a.major == b.major) {
-			return new Version(a.major, Math.max(a.minor, b.minor), Math.max(a.build, b.build), a.beta && b.beta);
-		} else if (a.major > b.major) {
-			return new Version(a.major, a.minor, Math.max(a.build, b.build), a.beta && b.beta);
+		int comp = a.compareTo(b);
+		if (comp >= 0) {
+			return new Version(a.major, a.minor, Math.max(a.build, b.build), a.beta);
 		} else {
-			return new Version(b.major, b.minor, Math.max(a.build, b.build), a.beta && b.beta);
+			return new Version(b.major, b.minor, Math.max(a.build, b.build), b.beta);
 		}
 	}
 
@@ -43,6 +42,32 @@ public class Version {
 		this.beta = beta;
 	}
 
+	@Override
+	public Version clone() {
+		try {
+			return (Version) super.clone();
+		} catch (CloneNotSupportedException e) {
+			throw new InternalError(e);
+		}
+	}
+
+	@Override
+	public int compareTo(Version o) {
+		if (major == o.major) {
+			if (minor == o.minor) {
+				if (beta == o.beta) {
+					return 0;
+				} else {
+					return beta ? 1 : -1;
+				}
+			} else {
+				return minor - o.minor;
+			}
+		} else {
+			return major - o.major;
+		}
+	}
+
 	/**
 	 * @return the build num of this version
 	 */
@@ -62,6 +87,11 @@ public class Version {
 	 */
 	public int getMinor() {
 		return minor;
+	}
+
+	public void increment() {
+		minor++;
+		build++;
 	}
 
 	/**
@@ -104,6 +134,11 @@ public class Version {
 	 */
 	public void setMinor(int minor) {
 		this.minor = minor;
+	}
+
+	@Override
+	public String toString() {
+		return "Version " + major + "." + minor + "." + build + (beta ? " Beta" : "");
 	}
 
 	public void writeVersion(DataOutputStream dos) throws IOException {

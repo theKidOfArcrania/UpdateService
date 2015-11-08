@@ -24,6 +24,9 @@ import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.shellupdate.ui.ProgressViewer;
+import org.shellupdate.ui.UpdateDialog;
+
 public class Updater {
 	public static final Properties params = new Properties();
 
@@ -46,7 +49,7 @@ public class Updater {
 			File updateFile = new File(params.getProperty("update.path"), updateName + ".upd");
 			int lenRead;
 			byte[] buffer = new byte[8196];
-			JarFile oldVersion = new JarFile(oldShell);
+			JarFile oldVersion = oldShell.exists() ? new JarFile(oldShell) : null;
 			JarFile newVersion = new JarFile(newShell);
 
 			progress.setProgress(11);
@@ -55,12 +58,13 @@ public class Updater {
 			long updateSize = 0;
 			Vector<JarEntry> entriesVec = new Vector<>();
 			Enumeration<JarEntry> entries = newVersion.entries();
+
 			// Get size stuff and add directories.
 			while (entries.hasMoreElements()) {
 				JarEntry entry = entries.nextElement();
-				JarEntry oldEntry = oldVersion.getJarEntry(entry.getName());
+				JarEntry oldEntry = oldVersion == null ? new JarEntry("") : oldVersion.getJarEntry(entry.getName());
 
-				if (oldEntry == null) {
+				if (oldEntry == null && oldVersion != null) {
 					// Retrieve entries with back-slashes instead of forward slashes?
 					oldEntry = oldVersion.getJarEntry(entry.getName().replace('/', '\\'));
 				}
@@ -108,7 +112,9 @@ public class Updater {
 				jos.putNextEntry(new ZipEntry("VERSION"));
 				latest.writeVersion(new DataOutputStream(jos));
 			}
-			oldVersion.close();
+			if (oldVersion != null) {
+				oldVersion.close();
+			}
 			newVersion.close();
 
 			if (changed) {
@@ -153,12 +159,14 @@ public class Updater {
 
 						Version version = new Version();
 						version.readVersion(dis);
+						version.increment();
 						max = Version.latestVersion(max, version);
 					} catch (Exception e) {
 						e.printStackTrace();
 						// Silently ignore any errors. We don't care about them at this point.
 					}
 				}
+
 				return max;
 			}
 		} else {
