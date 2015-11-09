@@ -64,7 +64,7 @@ public class Shell {
 		// Open a connnection to the provider JAR file
 		JarVerifier jv = new JarVerifier(updateSource);
 
-		Path tempUpgradePath = Files.createTempDirectory(params.getProperty("update.path"));
+		Path tempUpgradePath = Files.createTempDirectory("update");
 		if (updateCert == null) {
 			updateCert = getUpdatesCert();
 		}
