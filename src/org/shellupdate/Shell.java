@@ -28,9 +28,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
 
 import javax.swing.JOptionPane;
@@ -209,7 +211,13 @@ public class Shell {
 			progView.setProgressText("Copying update applies...");
 			boolean error[] = { false };
 
-			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile))) {
+			Manifest mf = new Manifest();
+			Attributes main = mf.getMainAttributes();
+			main.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+			main.put(Attributes.Name.CLASS_PATH, ".");
+			main.put(Attributes.Name.MAIN_CLASS, params.getProperty("shell.main"));
+
+			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile), mf)) {
 				byte[] buffer = new byte[8192];
 				jos.setLevel(9);
 
