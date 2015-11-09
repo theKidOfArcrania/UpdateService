@@ -13,10 +13,11 @@ import net.jimmc.jshortcut.JShellLink;
 
 public class Main {
 
-	public static JShellLink createDesktopShortcut(String filePath, String iconLocation, int iconIndex) {
+	public static JShellLink createDesktopShortcut(String filePath, String name, String iconLocation, int iconIndex, String arguments) {
 		JShellLink link = new JShellLink();
 		link.setFolder(JShellLink.getDirectory("desktop"));
-		link.setName("Stuff");
+		link.setName(name);
+		link.setArguments(arguments);
 		link.setPath(filePath);
 		link.setIconLocation(iconLocation);
 		link.setIconIndex(iconIndex);
@@ -30,7 +31,8 @@ public class Main {
 			Properties params = new Properties();
 			params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 
-			Path shellAppPath = Paths.get(System.getenv("HOMEDRIVE"), System.getenv("HOMEPATH"), params.getProperty("shell.name"));
+			String shellName = params.getProperty("shell.name");
+			Path shellAppPath = Paths.get(System.getenv("HOMEDRIVE"), System.getenv("HOMEPATH"), shellName);
 			Path shellJarPath = shellAppPath.resolve("Shell.jar");
 			Path shellIconPath = shellAppPath.resolve("AppIcon.ico");
 
@@ -57,13 +59,13 @@ public class Main {
 			Files.copy(installJarPath, shellJarPath);
 
 			@SuppressWarnings("resource")
-			InputStream shellIcon = ClassLoader.getSystemResourceAsStream(params.getProperty("shell.icon.path"));
+			InputStream shellIcon = ClassLoader.getSystemResourceAsStream(params.getProperty("shell.icon.path", ""));
 			if (shellIcon != null) {
 				Files.copy(shellIcon, shellIconPath);
-				createDesktopShortcut(shellJarPath.toString(), shellIconPath.toString(), 0);
+				createDesktopShortcut(shellJarPath.toString(), shellName, shellIconPath.toString(), 0, "-shell");
 				shellIcon.close();
 			} else {
-				createDesktopShortcut(shellJarPath.toString(), "java.exe", 0);
+				createDesktopShortcut(shellJarPath.toString(), shellName, "java.exe", 0, "-shell");
 			}
 			splashScreen.dispose();
 		} else {
