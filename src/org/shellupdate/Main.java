@@ -69,9 +69,9 @@ public class Main {
 			}
 			splashScreen.dispose();
 		} else {
-			if (args[0].equals("-shell") || args[0].equals("-s")) {
+			if (args[0].equalsIgnoreCase("-shell") || args[0].equals("-s")) {
 				Shell.run(new String[0]);
-			} else if (args[0].equals("-update") || args[0].equals("-u")) {
+			} else if (args[0].equalsIgnoreCase("-update") || args[0].equals("-u")) {
 				Updater.run(new String[0]);
 			}
 		}

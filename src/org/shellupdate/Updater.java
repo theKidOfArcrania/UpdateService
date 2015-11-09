@@ -8,7 +8,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.net.URL;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -62,7 +61,7 @@ public class Updater {
 			// Get size stuff and add directories.
 			while (entries.hasMoreElements()) {
 				JarEntry entry = entries.nextElement();
-				JarEntry oldEntry = oldVersion == null ? new JarEntry("") : oldVersion.getJarEntry(entry.getName());
+				JarEntry oldEntry = oldVersion == null ? null : oldVersion.getJarEntry(entry.getName());
 
 				if (oldEntry == null && oldVersion != null) {
 					// Retrieve entries with back-slashes instead of forward slashes?
@@ -182,9 +181,7 @@ public class Updater {
 			e.printStackTrace();
 			System.exit(1);
 		}
-
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
-		System.setErr(new PrintStream(new FileOutputStream(File.createTempFile("err", ".log"))));
 		UpdateDialog dlg = new UpdateDialog();
 		dlg.setVisible(true);
 	}
