@@ -396,6 +396,7 @@ public class UpdateDialog extends JFrame {
 			update.setDaemon(true);
 			update.start();
 			progDlg.setModal(true);
+			progDlg.setLocationRelativeTo(null);
 			progDlg.setVisible(true);
 		}
 

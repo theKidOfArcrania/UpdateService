@@ -68,12 +68,15 @@ public class Main {
 				createDesktopShortcut(shellJarPath.toString(), shellName, "java.exe", 0, "-shell");
 			}
 			splashScreen.dispose();
+			System.exit(0);
 		} else {
 			if (args[0].equalsIgnoreCase("-shell") || args[0].equals("-s")) {
 				Shell.run(new String[0]);
+				System.exit(0);
 			} else if (args[0].equalsIgnoreCase("-update") || args[0].equals("-u")) {
 				Updater.run(new String[0]);
 			}
 		}
+
 	}
 }

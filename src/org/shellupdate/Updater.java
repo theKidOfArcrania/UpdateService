@@ -184,6 +184,7 @@ public class Updater {
 		params.load(ClassLoader.getSystemResourceAsStream("params.PROPERTIES"));
 		UpdateDialog dlg = new UpdateDialog();
 		dlg.setVisible(true);
+		dlg.setLocationRelativeTo(null);
 	}
 
 	public static boolean verifyUpdateID(Component parent, char[] keyStorePass, char[] updaterPass) {

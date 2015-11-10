@@ -124,6 +124,7 @@ public class Shell {
 			try {
 				SplashLoadDialog progDlg = new SplashLoadDialog(null, ImageHelper.loadImage("org/shellupdate/About.png"));
 				progDlg.setVisible(true);
+				progDlg.setLocationRelativeTo(null);
 				progView = progDlg;
 			} catch (IOException e1) {
 				e1.printStackTrace();
@@ -259,7 +260,6 @@ public class Shell {
 		progView.finish();
 
 		ProcessBuilder shell = new ProcessBuilder();
-
 		Process program = shell.command("java", "-jar", shellFile.getAbsolutePath()).inheritIO().start();
 	}
 
