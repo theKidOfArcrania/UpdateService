@@ -1,13 +1,16 @@
 package org.shellupdate;
 
-import java.awt.Graphics;
-import java.awt.Window;
-import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Properties;
+
+import javax.swing.JOptionPane;
 
 import net.jimmc.jshortcut.JShellLink;
 
@@ -40,21 +43,11 @@ public class Main {
 				Path installJarPath = Paths.get(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI());
 
 				if (Files.exists(shellAppPath)) {
-					return;
-				}
-
-				BufferedImage splash = ImageHelper.loadImage("org/shellupdate/About.png");
-				Window splashScreen = new Window(null) {
-					private static final long serialVersionUID = 8733767680868899639L;
-
-					@Override
-					public void paint(Graphics g) {
-						g.drawImage(splash, 0, 0, this);
+					if (JOptionPane.showConfirmDialog(null, shellName
+							+ " already is installed, would you like to reinstall program?", "Installer", JOptionPane.YES_NO_CANCEL_OPTION) == JOptionPane.YES_OPTION) {
+						deleteFolder(shellAppPath);
 					}
-				};
-				splashScreen.setSize(splash.getWidth(), splash.getHeight());
-				splashScreen.setVisible(true);
-				splashScreen.setLocationRelativeTo(null);
+				}
 
 				Files.createDirectory(shellAppPath);
 				Files.copy(installJarPath, shellJarPath);
@@ -68,8 +61,9 @@ public class Main {
 				} else {
 					createDesktopShortcut(shellJarPath.toString(), shellName, "java.exe", 0, "-shell");
 				}
-				splashScreen.dispose();
-				System.exit(0);
+
+				ProcessBuilder shell = new ProcessBuilder();
+				Process program = shell.command("java", "-jar", shellJarPath.toString()).directory(shellAppPath.toFile()).inheritIO().start();
 			} else {
 				if (args[0].equalsIgnoreCase("-shell") || args[0].equals("-s")) {
 					Shell.run(new String[0]);
@@ -79,9 +73,36 @@ public class Main {
 				}
 			}
 		} catch (Exception e) {
+			// TO DO: better error reporting.
 			e.printStackTrace();
 			System.exit(1);
 		}
 
+	}
+
+	private static void deleteFolder(Path folder) throws IOException {
+		Files.walkFileTree(folder, new FileVisitor<Path>() {
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				Files.delete(dir);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				Files.delete(file);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+		});
 	}
 }
