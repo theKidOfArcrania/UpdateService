@@ -96,6 +96,7 @@ public class Shell {
 		}
 	}
 
+	@SuppressWarnings("resource")
 	public static void run(String[] args) throws IOException {
 		try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -112,6 +113,7 @@ public class Shell {
 
 		Path updShellPath = Files.createTempDirectory("program");
 		boolean updated = false;
+		boolean hasManifest = false;
 		Version current = new Version();
 
 		if (!shellFile.exists()) {
@@ -121,6 +123,7 @@ public class Shell {
 		}
 
 		try (JarFile shellJarFile = new JarFile(shellFile)) {
+			hasManifest = shellJarFile.getManifest() == null;
 			try {
 				SplashLoadDialog progDlg = new SplashLoadDialog(null, ImageHelper.loadImage("org/shellupdate/About.png"));
 				progDlg.setVisible(true);
@@ -212,13 +215,7 @@ public class Shell {
 			progView.setProgressText("Copying update applies...");
 			boolean error[] = { false };
 
-			Manifest mf = new Manifest();
-			Attributes main = mf.getMainAttributes();
-			main.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-			main.put(Attributes.Name.CLASS_PATH, ".");
-			main.put(Attributes.Name.MAIN_CLASS, params.getProperty("shell.main"));
-
-			try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(shellFile), mf)) {
+			try (JarOutputStream jos = initJar(new FileOutputStream(shellFile), !hasManifest)) {
 				byte[] buffer = new byte[8192];
 				jos.setLevel(9);
 
@@ -360,6 +357,19 @@ public class Shell {
 		try (InputStream in = ClassLoader.getSystemResourceAsStream(params.getProperty("update.cert", "updater.crt"))) {
 			X509Certificate cert = (X509Certificate) cf.generateCertificate(in);
 			return cert;
+		}
+	}
+
+	private static JarOutputStream initJar(OutputStream os, boolean addManifest) throws IOException {
+		if (addManifest) {
+			Manifest mf = new Manifest();
+			Attributes main = mf.getMainAttributes();
+			main.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+			main.put(Attributes.Name.CLASS_PATH, ".");
+			main.put(Attributes.Name.MAIN_CLASS, params.getProperty("shell.main"));
+			return new JarOutputStream(os, mf);
+		} else {
+			return new JarOutputStream(os);
 		}
 	}
 
